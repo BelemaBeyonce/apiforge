@@ -21,14 +21,16 @@ def test_crud_and_filtering(client, task_data):
     assert page["total"] == 2 and page["items"][0]["id"] == b["id"]
     assert client.get(ROOT + "/tasks?language=python&difficulty=easy").json()["total"] == 1
     assert client.get(ROOT + "/tasks?offset=100").json()["items"] == []
-    updated = client.put(f"{ROOT}/tasks/{a['id']}", json=dict(task_data, title="Revised"))
+    updated = client.put(
+        f"{ROOT}/tasks/{a['id']}", json=dict(task_data, title="Revised", expected_revision=1)
+    )
     assert updated.status_code == 200
     assert updated.json()["revision"] == 2
-    assert client.delete(f"{ROOT}/tasks/{a['id']}").status_code == 204
+    assert client.delete(f"{ROOT}/tasks/{a['id']}", headers={"If-Match": "2"}).status_code == 204
     assert client.get(f"{ROOT}/tasks/{a['id']}").status_code == 404
 
 
-def test_evaluation_history_snapshot_and_cascade(client, task_data):
+def test_evaluation_history_snapshot_and_archive(client, task_data):
     task = create(client, task_data)
     url = f"{ROOT}/tasks/{task['id']}"
     result = client.post(url + "/evaluations", json={"response": "use sorted"})
@@ -37,13 +39,13 @@ def test_evaluation_history_snapshot_and_cascade(client, task_data):
     assert evaluation["score"] == 66.67
     assert evaluation["feedback"][1]["passed"] is False
     assert evaluation["created_at"]
-    client.put(url, json=dict(task_data, title="Changed"))
+    client.put(url, json=dict(task_data, title="Changed", expected_revision=1))
     stored = client.get(f"{ROOT}/evaluations/{evaluation['id']}").json()
     assert stored["task_snapshot"]["title"] == "Explain sorting"
     assert stored["task_snapshot"]["revision"] == 1
     assert client.get(url + "/evaluations?limit=1").json()["total"] == 1
-    client.delete(url)
-    assert client.get(f"{ROOT}/evaluations/{evaluation['id']}").status_code == 404
+    client.delete(url, headers={"If-Match": "2"})
+    assert client.get(f"{ROOT}/evaluations/{evaluation['id']}").status_code == 200
 
 
 @pytest.mark.parametrize(
@@ -53,7 +55,7 @@ def test_evaluation_history_snapshot_and_cascade(client, task_data):
         {"language": "Python"},
         {"difficulty": "extreme"},
         {"criteria": []},
-        {"criteria": [{"name": "x", "kind": "regex", "reference": "x"}]},
+        {"criteria": [{"name": "x", "kind": "invalid", "reference": "x"}]},
         {"criteria": [{"name": "x", "kind": "exact", "reference": "x", "weight": 0}]},
         {"title": "x" * 201},
         {"extra": "unknown"},
@@ -92,13 +94,16 @@ def test_bad_submission(client, task_data, body):
 def test_missing_and_invalid_ids(client, task_data):
     for method, path, body in [
         ("GET", "/tasks/999", None),
-        ("PUT", "/tasks/999", task_data),
+        ("PUT", "/tasks/999", dict(task_data, expected_revision=1)),
         ("DELETE", "/tasks/999", None),
         ("POST", "/tasks/999/evaluations", {"response": "x"}),
         ("GET", "/tasks/999/evaluations", None),
         ("GET", "/evaluations/999", None),
     ]:
-        assert client.request(method, ROOT + path, json=body).status_code == 404
+        assert (
+            client.request(method, ROOT + path, json=body, headers={"If-Match": "1"}).status_code
+            == 404
+        )
     assert client.get(ROOT + "/tasks/0").status_code == 422
     assert client.get(ROOT + "/tasks/nope").status_code == 422
 
@@ -106,7 +111,7 @@ def test_missing_and_invalid_ids(client, task_data):
 def test_health_docs_and_malformed_json(client):
     assert client.get(ROOT + "/health").json() == {"status": "ok"}
     assert client.get("/docs").status_code == 200
-    assert client.get("/openapi.json").json()["info"]["version"] == "0.1.0"
+    assert client.get("/openapi.json").json()["info"]["version"] == "0.2.0"
     response = client.post(
         ROOT + "/tasks", content="{", headers={"Content-Type": "application/json"}
     )

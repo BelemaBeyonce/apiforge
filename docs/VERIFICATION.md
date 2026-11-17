@@ -1,51 +1,48 @@
-# Executed verification
+# Executed verification — APIForge 0.2
 
-Verified on 17 November 2026 using Python 3.12.14 in the development environment. These are executed results, not predictions of future CI runs.
+Verified on 17 November 2026 with Python 3.12.14. Counts below are actual local executions, not assumptions carried over from the original project or claims of hosted CI success.
 
-| Stage | Actual result |
+| Check | Actual result |
 |---|---|
-| Pure evaluation module | 8 tests passed |
-| API, validation and persistence | 33 tests passed after fixes |
-| Final suite including migrations | **34 tests passed**, **98.94% application line coverage** |
-| Ruff lint and formatting | Passed |
-| SQLite migrations | Upgrade, schema drift check, downgrade, re-upgrade passed |
-| Sample data | Seed run twice without duplicates |
-| Local Uvicorn HTTP demo | Passed against SQLite on port 8010 |
-| Docker image | Build passed with BuildKit CA secret for this environment's HTTPS proxy |
-| SQLite Compose service | Healthy; HTTP demo passed on port 8000; non-root UID 999; `pip check` passed |
-| PostgreSQL 16 Compose service | Healthy; HTTP demo passed on port 8011; seed, schema drift check, downgrade and re-upgrade passed |
-| GitHub Actions | Workflow supplied; not run on GitHub during this delivery |
+| Unmodified baseline | 34 passed, 98.94% application coverage |
+| Auth/history checkpoint | 61 passed, including preserved legacy rows |
+| Regex/categories/comparison checkpoint | 74 passed |
+| Final SQLite suite | **97 passed; 98.51% application line coverage** |
+| Final PostgreSQL suite | **98 passed; 98.51% application line coverage** |
+| Ruff lint / formatting | Passed |
+| Legacy migrations | Seeded 0001 tasks/results upgraded to head on SQLite and PostgreSQL; scores/snapshots/IDs/engine versions preserved; schema drift check passed |
+| Competing updates | Two independent sessions raced; one revision update won, one returned conflict, on each database backend |
+| AI adapter | HTTPX mocked-transport checks passed for request contract, structured output, consent, retries/recovery, timeout/network failure, output limit and sanitized persistence |
+| Human review | Different authorized actor required; conflicting/repeated review rejected |
+| Dependency audit | pip-audit of final requirements-dev.lock: **no known vulnerabilities found** at execution time |
+| Docker | Image built with optional trusted CA build secret; UID 999; pip check passed; isolated demo passed |
+| Live container HTTP | Readiness/liveness and full authenticated mock-AI demo passed on port 8012 |
+| GitHub Actions | See the exact commit's Actions page; workflow file alone is not a successful hosted run |
+| Paid/live model | **Not executed**; real adapter transport integration tested with mocks |
+| Hosted deployment | **Not performed**; Render template and instructions supplied |
 
-Final test command:
+Final suite commands:
 
 ```bash
 pytest --cov=app --cov-report=term-missing --cov-fail-under=90
+APIFORGE_TEST_DATABASE_URL=postgresql+psycopg://postgres@localhost:55432/apiforge_phase2_test pytest --cov=app --cov-report=term-missing --cov-fail-under=90
+ruff check .
+ruff format --check .
+pip-audit --disable-pip --no-deps -r requirements-dev.lock
+python -m examples.demo --in-process
 ```
 
-One third-party deprecation warning remains: Starlette's TestClient refers to an AnyIO alias slated for removal. It does not affect these successful test runs. Keep dependency upgrades under regression testing.
+The PostgreSQL suite uses unique per-test schemas in a disposable PostgreSQL 16 container. Its extra test is the PostgreSQL seeded-legacy migration case. This is a complete API/unit test run using PostgreSQL-backed fixtures, not only a SELECT 1 smoke test. The SQLite migration case also runs during that invocation. The body-timeout branch and a few operator/transport cleanup branches are not covered; coverage is a useful signal, not proof of security.
 
-## Failures encountered and resolved
+## Resolved findings and changes
 
-- Initial evaluator tests could not import the project before installation. Installed the package with `pip install -e '.[dev]'`; all eight tests then passed.
-- An API test searched error messages for the substring `input`, incorrectly rejecting the valid message `Extra inputs are not permitted`. Corrected the assertion to check that raw `input` keys are absent from error details; the suite passed.
-- Initial Ruff checks flagged import order, dictionary style and the deliberate broad HTTP-boundary exception handler. Applied formatting/import fixes and documented the boundary exception suppression. Final lint checks pass.
-- Docker's first build could not validate this managed environment's proxy certificate. Added an optional BuildKit `pip_ca` secret and rebuilt with the environment's trusted CA bundle, retaining TLS verification. The secret is not copied into image layers.
-- The default PostgreSQL API port 8001 was already occupied. Made the port configurable through `POSTGRES_API_PORT` and completed verification on 8011.
+- Independently reproduced the old 34-test baseline before modifications.
+- Updated old regression contracts only where documented API changes require authentication, revision fields, and archive preservation. The original normal/invalid/edge scenarios remain tested.
+- Found original Starlette advisories during the dependency audit; upgraded FastAPI/Starlette and reran the complete suite. Also upgraded pip, a dependency of the audit tool. No advisories were suppressed.
+- Fixed PostgreSQL FK-name discovery and portable typed JSON backfill while preserving the original migration file. SQLite FK checks protect batch recreation from the old cascade behavior.
+- Docker dependency installation uses this environment's enterprise-proxy CA through a build-only secret; certificate verification remains enabled. The default Dockerfile also works without that optional secret on ordinary trusted networks.
+- The final suite emits one upstream Starlette deprecation warning about HTTPX-based TestClient compatibility. Both final database runs still pass. Plan the next HTTP client compatibility upgrade under tests.
 
-## Reproduce the container checks
+## Interpretation
 
-Ordinary environments need no custom certificate:
-
-```bash
-docker compose up --build -d api
-python -m examples.demo --url http://127.0.0.1:8000
-```
-
-If an enterprise proxy requires a trusted CA bundle:
-
-```bash
-docker build --secret id=pip_ca,src=/path/to/trusted-ca-bundle.pem -t apiforge-api .
-docker compose up --no-build -d api
-```
-
-For PostgreSQL, use the password setup in the README, set `POSTGRES_API_PORT=8011` if needed, and run the same demo with that port. The checks exercised the real API over HTTP and a real PostgreSQL database. The complete 34-test suite uses isolated SQLite databases; this delivery does not claim the entire suite was executed against PostgreSQL.
+These results do not establish production readiness, live-provider semantic accuracy, or a successfully deployed website. Regex timeout outcomes can vary with system load; they are explicitly flagged. Model feedback is advisory, has independent review, and never executes code or replaces stored deterministic scores. New vulnerabilities may be published after this audit. Re-run checks and inspect the specific GitHub Actions result before merging or deploying.

@@ -9,12 +9,11 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: apiforge
-          POSTGRES_DB: apiforge
+          POSTGRES_DB: apiforge_test
           POSTGRES_HOST_AUTH_METHOD: trust
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U apiforge"
+          --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
@@ -25,15 +24,18 @@ jobs:
           cache-dependency-path: requirements-dev.lock
       - run: pip install -r requirements-dev.lock && pip install --no-deps -e .
       - run: ruff check . && ruff format --check .
-      - run: pytest --cov=app --cov-report=term-missing --cov-fail-under=90
-      - name: PostgreSQL migration and API integration
+      - name: SQLite tests and coverage
+        run: pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=90
+      - name: PostgreSQL tests, concurrent updates and legacy migrations
         env:
-          DATABASE_URL: postgresql+psycopg://apiforge@localhost:5432/apiforge
-        run: |
-          alembic upgrade head
-          alembic check
-          python -m examples.seed
-          python -m examples.demo --in-process
-          alembic downgrade base
-          alembic upgrade head
+          APIFORGE_TEST_DATABASE_URL: postgresql+psycopg://postgres@localhost:5432/apiforge_test
+        run: pytest --cov=app --cov-report=term --cov-fail-under=90
+      - name: Reproducible demonstration with mock AI
+        run: python -m examples.demo --in-process
+      - name: Dependency vulnerability audit
+        run: pip-audit --disable-pip --no-deps -r requirements-dev.lock
       - run: docker build -t apiforge:ci .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml

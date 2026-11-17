@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+import regex
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class StrictModel(BaseModel):
@@ -10,10 +11,29 @@ class StrictModel(BaseModel):
 
 class Criterion(StrictModel):
     name: str = Field(min_length=1, max_length=120)
-    kind: Literal["exact", "contains"]
+    kind: Literal["exact", "contains", "regex"]
     reference: str = Field(min_length=1, max_length=10000)
     weight: int = Field(default=1, ge=1, le=100)
     case_sensitive: bool = True
+    category: str = Field(default="general", min_length=1, max_length=80)
+
+    @model_validator(mode="after")
+    def bounded_regex(self):
+        if self.kind == "regex":
+            if len(self.reference) > 512 or self.reference.count("(") > 20:
+                raise ValueError("Regex limited to 512 characters and 20 groups")
+            if any(int(n) > 1000 for n in regex.findall(r"\d+", self.reference)):
+                raise ValueError("Regex numeric bounds are limited to 1000")
+            try:
+                regex.compile(self.reference)
+            except regex.error:
+                raise ValueError("Invalid regex") from None
+        return self
+
+
+class RubricCategory(StrictModel):
+    name: str = Field(min_length=1, max_length=80)
+    weight: int = Field(default=1, ge=1, le=100)
 
 
 class TaskInput(StrictModel):
@@ -23,6 +43,20 @@ class TaskInput(StrictModel):
     difficulty: Literal["easy", "medium", "hard"]
     expected_outcome: str = Field(min_length=1, max_length=20000)
     criteria: list[Criterion] = Field(min_length=1, max_length=50)
+    categories: list[RubricCategory] = Field(
+        default_factory=lambda: [RubricCategory(name="general")], min_length=1, max_length=10
+    )
+
+    @model_validator(mode="after")
+    def valid_categories(self):
+        names = {category.name for category in self.categories}
+        if len(names) != len(self.categories):
+            raise ValueError("Category names must be unique")
+        if names != {criterion.category for criterion in self.criteria}:
+            raise ValueError(
+                "Each category must be used; every criterion must reference a category"
+            )
+        return self
 
     @field_validator("criteria")
     @classmethod
@@ -32,10 +66,16 @@ class TaskInput(StrictModel):
         return criteria
 
 
+class TaskUpdate(TaskInput):
+    expected_revision: int = Field(ge=1)
+
+
 class TaskRead(TaskInput):
     model_config = ConfigDict(from_attributes=True)
     id: int
     revision: int
+    owner_id: int | None
+    archived_at: datetime | None
     created_at: datetime
     updated_at: datetime
 
@@ -50,6 +90,9 @@ class Feedback(BaseModel):
     earned_weight: int
     possible_weight: int
     message: str
+    category: str = "general"
+    contribution: float | None = None
+    reason: str | None = None
 
 
 class EvaluationRead(BaseModel):
@@ -57,6 +100,8 @@ class EvaluationRead(BaseModel):
     id: int
     task_id: int
     response: str
+    author_id: int | None
+    status: str
     score: float
     feedback: list[Feedback]
     task_snapshot: dict

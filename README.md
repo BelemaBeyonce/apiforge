@@ -1,133 +1,119 @@
 # APIForge — Python Backend & AI Evaluation Lab
 
-A Python 3.12+ backend portfolio project for backend engineering, AI engineering, and code evaluation interviews. Create coding tasks, define a reference rubric, submit inert text responses, and inspect reproducible weighted scores and persisted feedback.
+APIForge is a Python backend portfolio project for creating coding tasks, evaluating **inert text** against weighted rubrics, and inspecting feedback over time. It combines authenticated REST APIs, portable relational persistence, reproducible baseline scoring, and an optional, genuinely integrated OpenAI-compatible feedback adapter.
 
-The MVP evaluates **reference criteria**, not program correctness. It never executes submitted code and makes no LLM calls. A response containing `sorted` can satisfy a contains criterion even if its code is wrong. This deliberate limitation makes the evaluation behavior transparent, inexpensive, and safe to demonstrate.
+It addresses a practical evaluation problem: preserve what was assessed, how a score was calculated, and who can inspect it. Deterministic rubric results and model-generated advice are separate records. Neither establishes that submitted code works. **Submitted code is never executed.**
 
 ## Features
 
-- Versioned FastAPI REST API with create, read, replace, and delete task operations.
-- Pydantic validation, bounded pagination, exact language/difficulty filters, consistent errors, request IDs.
-- Weighted exact/contains rules, configurable case sensitivity, per-criterion feedback, scores from 0–100.
-- SQLAlchemy persistence with SQLite locally and PostgreSQL via Psycopg; Alembic owns schema changes.
-- Immutable evaluation snapshots capture rubric, task content, revision, and engine version.
-- JSON application logs exclude submissions, query strings, credentials, and raw validation input.
-- Interactive Swagger UI, ReDoc, sample tasks, repeatable API demo, automated tests, Docker, and GitHub Actions.
+- FastAPI/Pydantic APIs and interactive Swagger Bearer authentication.
+- Argon2id password hashes, expiring JWTs, database-backed role/activation checks, and operator-only first-admin bootstrap.
+- Admin, evaluator, and viewer roles; task ownership and explicit reader/editor grants; unauthorized resources return 404.
+- Weighted exact, literal substring, and bounded regex criteria; category-normalized scoring and per-rule contributions.
+- Revision-checked updates, archival instead of destructive deletion, immutable evaluation snapshots, comparison endpoints.
+- Optional OpenAI-compatible integration with explicit external-transmission consent, structured output validation, bounded retries, and independent human review. A clearly labeled mock runs without a paid key.
+- SQLite and PostgreSQL, data-preserving Alembic migrations, request IDs, JSON logs, explicit CORS, body limits, readiness/liveness.
+- Automated tests, dependency audit, non-root Docker image, Compose, GitHub Actions, and a reproducible synthetic demonstration.
 
-## Local quick start
+## Windows quick start
 
-Run from this repository root with Python 3.12 or newer:
+Install Git and Python **3.12+**, then use PowerShell from the repository root:
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-# Windows PowerShell: .venv\Scripts\Activate.ps1
-python -m pip install -r requirements-dev.lock
-python -m pip install --no-deps -e .
-cp .env.example .env
-alembic upgrade head
-python -m examples.seed
-uvicorn app.main:app --reload --no-access-log
+```powershell
+git clone https://github.com/BelemaBeyonce/apiforge.git
+cd apiforge
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.lock
+.\.venv\Scripts\python.exe -m pip install --no-deps -e .
+Copy-Item .env.example .env
+$key = .\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(48))"
+Add-Content .env "JWT_SECRET=$key"
+.\.venv\Scripts\alembic.exe upgrade head
+.\.venv\Scripts\python.exe -m app.bootstrap
+.\.venv\Scripts\python.exe -m examples.seed
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --no-access-log --no-proxy-headers
 ```
 
-Visit [Swagger UI](http://127.0.0.1:8000/docs), [ReDoc](http://127.0.0.1:8000/redoc), or [health](http://127.0.0.1:8000/api/v1/health). The OpenAPI schema is at `/openapi.json`. Reload is for development. Migrations are explicit; starting the app does not silently create tables. Do not run multiple concurrent migration processes.
+The bootstrap command prompts privately for the first administrator's password (12–128 characters). It never promotes a pre-existing registration and cannot create another bootstrap admin after completion. Additional admins/evaluators are assigned by an authenticated admin. Keep `.env` local. Invoking the venv executable directly avoids PowerShell activation-policy changes.
 
-The dependency lock files capture the versions used for this delivery; `pyproject.toml` defines supported ranges. Re-resolve and audit dependencies deliberately before a public deployment. Runtime dependencies are in `requirements.lock`; HTTPX and Pytest are development tools.
+Open **http://127.0.0.1:8000/docs**. Register a viewer or log in using `POST /api/v1/auth/login`, copy its `access_token`, and click **Authorize** in Swagger (paste the token without the `Bearer` prefix). Use your bootstrap administrator for task creation, or promote a registered user to evaluator through `PUT /api/v1/users/{id}`. Re-login after any role/activation change because previous tokens are revoked.
+
+For Linux/macOS, create `.venv` with `python3.12 -m venv .venv`, activate it, and run the same commands without the Windows executable prefixes. Generate the key using Python's `secrets.token_urlsafe(48)` and write it only to your local `.env`.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    HTTP[HTTP / Swagger] --> API[Routes and Pydantic validation]
-    API --> Service[Task business service]
-    Service --> Engine[Deterministic evaluator]
-    Service --> ORM[SQLAlchemy models and session]
-    ORM --> DB[(SQLite / PostgreSQL)]
+    Client[Swagger or HTTP client] --> Limits[Body limits / CORS / request IDs]
+    Limits --> Auth[JWT identity and role dependencies]
+    Auth --> API[FastAPI routes and Pydantic schemas]
+    API --> Tasks[Task service: access / revision checks]
+    Tasks --> Baseline[Deterministic rubric evaluator]
+    Tasks --> DB[(SQLAlchemy: SQLite or PostgreSQL)]
+    API --> AI[Optional AI service]
+    AI --> Provider[Mock or OpenAI-compatible provider]
+    AI --> DB
+    API --> Review[Independent human review]
+    Review --> DB
     Alembic[Alembic migrations] --> DB
 ```
 
-| Component | Responsibility |
-|---|---|
-| `app/main.py` | App assembly, error envelopes, request IDs, completion logs |
-| `app/api/routes.py` | HTTP routing, pagination and query filters |
-| `app/schemas.py` | Input limits, criterion definitions, response schemas |
-| `app/services/tasks.py` | Task writes, evaluation orchestration, snapshots and transactions |
-| `app/services/evaluator.py` | Pure deterministic scoring with no execution or external calls |
-| `app/models.py`, `app/database.py` | Persistence, request-scoped sessions, foreign key enforcement |
-| `app/config.py`, `app/logging.py` | Environment settings and JSON application logging |
-| `migrations/` | Explicit, reversible schema history |
-| `tests/` | Unit, API and migration tests on isolated temporary databases |
-| `examples/` | Sample tasks, idempotent seed command, repeatable demo |
+See [ARCHITECTURE.md](ARCHITECTURE.md) for module responsibilities, access rules, transaction boundaries, and tradeoffs.
 
-A request receives its own database session. Services commit each write transaction; session teardown closes and rolls back uncommitted work after failure. Lists use ascending IDs for deterministic ordering. Task replacement increments a revision; prior evaluation snapshots stay unchanged. Task deletion intentionally cascades to all owned evaluations. Concurrent replacements currently use last-write-wins semantics.
+## Run tests and the demonstration
 
-## API at a glance
-
-All data endpoints use `/api/v1`.
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/health` | Database connectivity/readiness |
-| POST | `/tasks` | Create task (201) |
-| GET | `/tasks` | List/filter tasks with `limit`, `offset`, `language`, `difficulty` |
-| GET | `/tasks/{id}` | Read task |
-| PUT | `/tasks/{id}` | Replace all editable fields |
-| DELETE | `/tasks/{id}` | Delete task and evaluations (204) |
-| POST | `/tasks/{id}/evaluations` | Evaluate a text response (201) |
-| GET | `/tasks/{id}/evaluations` | Paginated task history |
-| GET | `/evaluations/{id}` | Read evaluation and historical rubric |
-
-See [complete API examples](docs/API.md), [database schema](docs/DATABASE.md), and [security boundaries](SECURITY.md).
-
-## Tests and quality checks
-
-```bash
-pytest --cov=app --cov-report=term-missing --cov-fail-under=90
-ruff check .
-ruff format --check .
-alembic check
-python -m examples.demo --in-process
+```powershell
+.\.venv\Scripts\python.exe -m pytest --cov=app --cov-report=term-missing --cov-fail-under=90
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m ruff format --check .
+.\.venv\Scripts\python.exe -m examples.demo --in-process
 ```
 
-The demo uses your configured, migrated database, creates a temporary task, checks scores and validation, and deletes that task afterward. To exercise a running HTTP server instead:
+The demo creates a **temporary database**, bootstraps synthetic users, exercises login/RBAC, weighted scoring, revision conflicts, comparison, mocked AI, independent review, and archival history, then removes the database. It makes no external model calls and prints no passwords or tokens. It uses an in-process HTTP client, not a publicly hosted website.
 
-```bash
-python -m examples.demo --url http://127.0.0.1:8000
-```
-
-Tests cover normal CRUD, filters, empty pages, Unicode case folding, score rounding, inert malicious-looking input, invalid payloads, unknown fields, missing resources, sanitized failures, snapshot retention, cascade deletion, and migration upgrade/downgrade/schema drift. See [executed verification results](docs/VERIFICATION.md). CI runs the suite, lint/format checks, PostgreSQL migration and API integration, and an image build. A workflow file does not imply a hosted GitHub run has occurred.
+For the full API suite against PostgreSQL, set `APIFORGE_TEST_DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:5432/TEST_DB` and run Pytest again. Each fixture creates/drops a unique schema; the database user must be allowed to create schemas. Use a **dedicated disposable test database**, never production. The test run also verifies upgrades from the original `0001` schema with existing task/evaluation rows. See [actual verification](docs/VERIFICATION.md).
 
 ## Docker
 
+First copy `.env.example` to `.env` and generate a private `JWT_SECRET` as above:
+
 ```bash
 docker compose up --build -d api
-curl http://127.0.0.1:8000/api/v1/health
+docker compose exec api python -m app.bootstrap
 docker compose exec api python -m examples.seed
-docker compose logs api
-docker compose down
 ```
 
-SQLite persists in a named volume; `down` preserves it. The container runs as an unprivileged user. Host binding defaults to loopback. The single-service Compose command migrates before starting; for a multi-replica deployment use a separate migration job.
+Swagger: port 8000. The image runs as a non-root user; SQLite persists in a named volume. For PostgreSQL, set your own `POSTGRES_PASSWORD` in `.env`, then run `docker compose --profile postgres up --build -d api-postgres`. That API uses port 8001 (`POSTGRES_API_PORT` can change it). Set a matching `POSTGRES_DATABASE_URL` if customizing the user/database. No database password is supplied in source. The PostgreSQL Compose service exposes no database port to the host.
 
-For the PostgreSQL profile, set your own password (no default password is shipped):
+For enterprise HTTPS proxies, the Dockerfile supports an optional BuildKit `pip_ca` secret containing the trusted CA bundle; TLS verification remains enabled. See [deployment instructions](docs/DEPLOYMENT.md).
 
-```bash
-read -s -p 'PostgreSQL password: ' POSTGRES_PASSWORD; echo
-export POSTGRES_PASSWORD
-docker compose --profile postgres up --build -d api-postgres
-curl http://127.0.0.1:8001/api/v1/health
-```
+## Optional AI evaluation
 
-Set `POSTGRES_API_PORT=8011` if port 8001 is occupied. The default PostgreSQL username/database are `apiforge`. If you customize them, set `POSTGRES_DATABASE_URL=postgresql+psycopg://YOUR_USER@postgres:5432/YOUR_DB`. The password comes from `PGPASSWORD` inside the API container. For an externally managed database, set `DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:5432/DB` in your local environment and run migrations before starting Uvicorn. URL-encode credentials; require TLS using provider-specific connection parameters. Never commit `.env`.
+Disabled by default. To run the local mock, set `AI_ENABLED=true` and `AI_PROVIDER=mock` in development. It is visibly labeled synthetic and rejected in production settings.
 
-## Interview demonstration (about 7 minutes)
+For a real provider, set `AI_ENABLED=true`, `AI_PROVIDER=openai`, `AI_ALLOW_EXTERNAL=true`, and your own `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL`. Requests also require `consent_to_external=true`. This transmits the stored task/rubric, submitted response, and deterministic feedback to that provider. Only enable it for data you are authorized to transmit.
 
-1. Explain the safe MVP boundary: text criteria are deterministic and reproducible, while code execution and semantic judging require additional infrastructure.
-2. Open `/docs`, create a task using `examples/tasks.json`, and show Pydantic rejecting an invalid difficulty or empty rubric.
-3. Submit `Use sorted for stable ordering.` to the stable-sorting task. Show 100 points, then submit `Use sorted.` and explain the 66.67 weighted score.
-4. Replace the task title/rubric and retrieve an earlier evaluation. Show the stored revision and unchanged snapshot.
-5. Filter tasks by `language=python&difficulty=easy`, request `limit=1&offset=1`, and show structured validation errors and request IDs.
-6. Run the tests, explain fixture isolation and migration round trips, and trace route → service → pure evaluator → database.
-7. Discuss tradeoffs: reference matching can be gamed; SQLite has limited write concurrency; authentication, rate limiting, sandbox workers, and calibrated LLM judges belong on the roadmap.
+The adapter calls `/chat/completions`, requests JSON-schema output, validates it, and records model, prompt version, timestamp, safe usage metadata, and failure categories. Real HTTP behavior is tested with mocked transports; **no paid/live provider evaluation is claimed**. Model support for structured outputs varies. See [AI integration](docs/AI_EVALUATION.md).
 
-For a scripted demo, run `python -m examples.demo` while Uvicorn is running. Use [the roadmap](docs/ROADMAP.md) to discuss next steps. To publish, initialize a Git repository in this directory, review files, commit, and push to your own GitHub repository. No external repository or deployment is created by this deliverable.
+## API compatibility changes in 0.2
+
+- All task/evaluation/user/AI data endpoints now require Bearer authentication. Public registration creates viewers only.
+- Task replacement requires `expected_revision` in its complete PUT body; stale revisions return 409.
+- `DELETE /tasks/{id}` requires an integer `If-Match` revision and archives the task. It returns 204 and preserves history; ordinary task reads/lists omit archived tasks. Authorized users can request `include_archived=true` and read history.
+- Existing tasks keep their IDs, revisions, rubrics, scores, and evaluations. Legacy tasks without owners are visible only to admins. No account is silently granted access.
+- New tasks/evaluations use category-aware `deterministic-v2`; stored `deterministic-v1` results are not recalculated. Regex timeout outcomes are flagged `completed_with_limits`.
+
+## Documentation and portfolio demonstration
+
+- [API examples and permission matrix](docs/API.md)
+- [Database schema and migration policy](docs/DATABASE.md)
+- [Security boundaries](SECURITY.md)
+- [AI evaluation and human review](docs/AI_EVALUATION.md)
+- [Deployment / GitHub Actions](docs/DEPLOYMENT.md)
+- [Executed checks](docs/VERIFICATION.md)
+- [Seven-minute interview guide](docs/INTERVIEW_GUIDE.md)
+- [Roadmap](docs/ROADMAP.md)
+
+## Remaining limits
+
+This is a production-minded portfolio backend, **not a claim of production readiness**. Authentication throttling is per-process and must be supplemented by a shared gateway limiter. JWT refresh/password recovery, verified email, MFA, distributed quotas, durable jobs, and hosted deployment are future work. Regex time-budget failures can depend on machine load; their status and reason are explicit. Model advice can be wrong or manipulated despite safeguards. Protect data, bound concurrency/cost at your gateway, scan dependencies, rehearse restore procedures, and obtain an independent security review before exposing valuable data publicly.

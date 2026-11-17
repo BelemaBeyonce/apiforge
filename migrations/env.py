@@ -21,6 +21,10 @@ def offline():
 def online():
     engine = build_engine(settings.database_url)
     with engine.connect() as connection:
+        if connection.dialect.name == "sqlite":
+            # Batch table recreation must not trigger legacy ON DELETE CASCADE.
+            connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+            connection.commit()
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
@@ -28,6 +32,12 @@ def online():
         )
         with context.begin_transaction():
             context.run_migrations()
+        if connection.dialect.name == "sqlite":
+            violations = connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
+            if violations:
+                raise RuntimeError("Foreign key validation failed after migration")
+            connection.exec_driver_sql("PRAGMA foreign_keys=ON")
+            connection.commit()
     engine.dispose()
 
 

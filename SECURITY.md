@@ -1,18 +1,32 @@
-# Security boundaries
+# Security boundaries and limitations
 
-APIForge is a local portfolio MVP, not a hardened public multi-tenant service.
+APIForge is a portfolio backend with concrete controls, not a certification of public-production safety.
 
-- Submitted responses remain inert strings. No `exec`, `eval`, subprocess execution, dynamic imports, or test runner is applied to submitted content.
-- Exact/contains criteria are deterministic and intentionally limited. Keyword stuffing and nonfunctional code can score highly. Scores must not be presented as reliable hiring decisions or functional correctness results.
-- Authentication, authorization, tenant isolation, quotas, and rate limiting are not implemented. Any caller can read the reference rubric and manipulate tasks. Keep the service on loopback or behind an authenticated private gateway.
-- Field limits bound accepted content, but parsing happens before validation. Configure a reverse proxy with body size limits, timeouts, TLS, and rate limits before accepting untrusted network traffic.
-- Environment variables supply database credentials. `.env` is ignored, `.env.example` contains no usable password, containers run unprivileged, and request logs omit payloads and query strings. Use a secret manager in production. Do not put secrets into task text or submissions; these are stored in plaintext.
-- Database errors and unexpected failures return sanitized messages. Protected operational monitoring should capture diagnostic categories without logging credentials or sensitive payloads.
-- Deletion cascades to evaluation history. Define retention, backup, restore, and audit policies before storing valuable data.
-- Dependency versions are captured in lock files. Scan and update dependencies and base images before deployment. The CI PostgreSQL service uses passwordless trust only on its disposable runner; this must never be copied into a production database configuration.
+## Implemented controls
 
-## Future executable evaluation
+- Argon2id password hashes through argon2-cffi; plaintext passwords are never stored or returned. Registration validates email and password length, rejects role fields, and always creates viewers.
+- Explicit operator-only first-admin CLI. Existing registered emails cannot be promoted by bootstrap. A singleton database guard prevents simultaneous first-admin creation. Additional role changes require an authenticated admin; admins cannot disable/demote themselves through the API.
+- PyJWT HS256 with a fixed algorithm allowlist, issuer/audience/expiration/issued-at/subject/JTI/token-version requirements. Every request checks active user/role state in the DB. Role/activation changes revoke existing tokens by advancing token version.
+- Task ownership and reader/editor grants checked by reusable service logic. Hidden resources return 404. Evaluations, comparisons, AI advice and reviews inherit task visibility; viewer role never grants write permissions. Bearer tokens are never accepted in query strings.
+- Conditional revision updates and archive operations, immutable baseline snapshots, preserved history, and restricted parent deletion.
+- Bounded pattern/text/rubric limits and regex timeouts. No eval, exec, compile, subprocess, dynamic import, or execution is applied to submitted content.
+- Optional external AI disabled by default, explicit deployment/request consent, no execution tools, structured output validation, bounded transport/output/retries, and different-person human review. Provider errors are sanitized.
+- Request-body cap before parsing, body receive timeout, explicit CORS origins, application JSON logs that omit payloads/query strings/authorization headers, request IDs, non-root container runtime, and dependency audit in CI.
 
-Executing untrusted code requires an isolated worker service, not an endpoint calling Python locally. Use disposable sandboxes with strong isolation (such as microVMs), no application/database secrets, denied network egress, read-only images, unprivileged users, seccomp/capability restrictions, CPU/memory/process/file/time/output limits, and bounded queues. Handle malicious infinite loops and fork bombs; kill the entire sandbox on timeout. Separate test artifacts and scoring from the public API. Containers alone are not a sufficient security claim for hostile code.
+## Deployment obligations
 
-Future LLM judges need explicit consent for external processing, prompt-injection defenses, output-schema validation, provider timeout/retry budgets, data minimization, model/prompt versioning, human review, and calibration against a curated benchmark. Never interpolate task content into privileged instructions or give a judge execution tools by default.
+Authentication rate limiting uses the established limits library with in-memory per-process storage. It caps combined login/registration attempts per direct peer per minute and bounds peer tracking. It is **not shared across replicas**, and NAT/proxy peers may share a limit. Use one worker for a private demo and an upstream shared limiter, concurrency cap, TLS and bot controls before public exposure. Default commands disable proxy headers; only enable forwarded-IP handling when a correctly configured trusted gateway sanitizes them. Never trust arbitrary X-Forwarded-For.
+
+JWT_SECRET must be random, private and stable across workers; production requires an explicit >=32-character secret and PostgreSQL. Development without a configured secret generates an ephemeral one, so tokens stop working after restart. Production CORS allows only explicit HTTPS origins. CORS is a browser policy, not authorization. Configure allowed origins deliberately; use a secret manager, rotate keys, and establish incident procedures. Use encrypted PostgreSQL connections and least-privilege runtime DB credentials; migration operators need additional DDL privileges.
+
+Reader access exposes all authorized task history, including responses and AI advice. Stored content is plaintext in the database. Protect backups, define retention and user-erasure policy, and do not use real candidate data in public demos. Archive retention is intentional; there is no public hard-delete endpoint. API permissions cannot prevent an administrator with direct database access from changing records.
+
+There is no verified-email flow, password reset/change endpoint, refresh token, MFA, per-token logout, durable audit ledger, global quota or spend manager. Disabling users/reissuing role state revokes their tokens. Model advice can be gamed; exact/contains matching can reward nonfunctional code, regex timeouts depend on load, and AI can hallucinate. Never present these scores as automatic hiring decisions or correctness guarantees.
+
+## Future execution infrastructure
+
+If executable tests are added, use a separate isolated worker with disposable microVM/sandbox boundaries, denied egress, no app/database secrets, CPU/memory/process/time/output limits, read-only base images, and adversarial containment tests. Containers alone are not a sufficient claim of safety for hostile code. Do not add local execution to the API process.
+
+## Vulnerability handling
+
+Run the supplied dependency audit and regression suite before release; pins age and new advisories appear. Secrets, .env, virtual environments, generated SQLite files, credential files and private key files are ignored. Report suspected vulnerabilities privately to the repository owner; do not post secrets in public issues. Follow the documented backup/restore procedure before migrations.
