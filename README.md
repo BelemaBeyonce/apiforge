@@ -120,14 +120,4 @@ curl http://127.0.0.1:8001/api/v1/health
 
 Set `POSTGRES_API_PORT=8011` if port 8001 is occupied. The default PostgreSQL username/database are `apiforge`. If you customize them, set `POSTGRES_DATABASE_URL=postgresql+psycopg://YOUR_USER@postgres:5432/YOUR_DB`. The password comes from `PGPASSWORD` inside the API container. For an externally managed database, set `DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:5432/DB` in your local environment and run migrations before starting Uvicorn. URL-encode credentials; require TLS using provider-specific connection parameters. Never commit `.env`.
 
-## Interview demonstration (about 7 minutes)
 
-1. Explain the safe MVP boundary: text criteria are deterministic and reproducible, while code execution and semantic judging require additional infrastructure.
-2. Open `/docs`, create a task using `examples/tasks.json`, and show Pydantic rejecting an invalid difficulty or empty rubric.
-3. Submit `Use sorted for stable ordering.` to the stable-sorting task. Show 100 points, then submit `Use sorted.` and explain the 66.67 weighted score.
-4. Replace the task title/rubric and retrieve an earlier evaluation. Show the stored revision and unchanged snapshot.
-5. Filter tasks by `language=python&difficulty=easy`, request `limit=1&offset=1`, and show structured validation errors and request IDs.
-6. Run the tests, explain fixture isolation and migration round trips, and trace route → service → pure evaluator → database.
-7. Discuss tradeoffs: reference matching can be gamed; SQLite has limited write concurrency; authentication, rate limiting, sandbox workers, and calibrated LLM judges belong on the roadmap.
-
-For a scripted demo, run `python -m examples.demo` while Uvicorn is running. Use [the roadmap](docs/ROADMAP.md) to discuss next steps. To publish, initialize a Git repository in this directory, review files, commit, and push to your own GitHub repository. No external repository or deployment is created by this deliverable.
