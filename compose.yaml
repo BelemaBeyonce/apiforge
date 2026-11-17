@@ -1,0 +1,40 @@
+services:
+  api:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      DATABASE_URL: sqlite:////data/apiforge.db
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - sqlite-data:/data
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log"]
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-apiforge}
+      POSTGRES_DB: ${POSTGRES_DB:-apiforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  api-postgres:
+    build: .
+    profiles: ["postgres"]
+    ports:
+      - "127.0.0.1:${POSTGRES_API_PORT:-8001}:8000"
+    environment:
+      DATABASE_URL: ${POSTGRES_DATABASE_URL:-postgresql+psycopg://apiforge@postgres:5432/apiforge}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log"]
+volumes:
+  sqlite-data:
+  postgres-data:

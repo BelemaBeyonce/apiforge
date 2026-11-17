@@ -1,0 +1,64 @@
+[
+  {
+    "title": "Explain stable sorting",
+    "description": "Explain how to sort a list in Python and preserve equal-item order.",
+    "language": "python",
+    "difficulty": "easy",
+    "expected_outcome": "Mention sorted and stable ordering.",
+    "criteria": [
+      {
+        "name": "Python builtin",
+        "kind": "contains",
+        "reference": "sorted",
+        "weight": 2,
+        "case_sensitive": true
+      },
+      {
+        "name": "Stable ordering",
+        "kind": "contains",
+        "reference": "stable",
+        "weight": 1,
+        "case_sensitive": false
+      }
+    ]
+  },
+  {
+    "title": "Sum output prediction",
+    "description": "Without executing code, state the output of print(sum([1, 2, 3])).",
+    "language": "python",
+    "difficulty": "easy",
+    "expected_outcome": "6",
+    "criteria": [
+      {
+        "name": "Expected output",
+        "kind": "exact",
+        "reference": "6",
+        "weight": 1,
+        "case_sensitive": true
+      }
+    ]
+  },
+  {
+    "title": "Describe request validation",
+    "description": "Explain how a FastAPI backend validates request bodies.",
+    "language": "python",
+    "difficulty": "medium",
+    "expected_outcome": "Mention Pydantic and HTTP 422.",
+    "criteria": [
+      {
+        "name": "Schema validation",
+        "kind": "contains",
+        "reference": "Pydantic",
+        "weight": 2,
+        "case_sensitive": false
+      },
+      {
+        "name": "Validation status",
+        "kind": "contains",
+        "reference": "422",
+        "weight": 1,
+        "case_sensitive": true
+      }
+    ]
+  }
+]
