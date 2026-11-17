@@ -1,0 +1,21 @@
+# Create a managed PostgreSQL database separately, then set DATABASE_URL to its
+# postgresql+psycopg:// URL. No live deployment or database is created by this file.
+services:
+  - type: web
+    name: apiforge
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/v1/ready
+    preDeployCommand: alembic upgrade head
+    dockerCommand: sh -c 'exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --no-access-log --no-proxy-headers'
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        value: '[]'
+      - key: AI_ENABLED
+        value: 'false'

@@ -6,9 +6,17 @@ services:
     environment:
       DATABASE_URL: sqlite:////data/apiforge.db
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      JWT_SECRET: ${JWT_SECRET:?Generate JWT_SECRET in .env first}
+      CORS_ORIGINS: ${CORS_ORIGINS:-[]}
+      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      AI_ALLOW_EXTERNAL: ${AI_ALLOW_EXTERNAL:-false}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
     volumes:
       - sqlite-data:/data
-    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log"]
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log --no-proxy-headers"]
   postgres:
     image: postgres:16-alpine
     profiles: ["postgres"]
@@ -31,10 +39,13 @@ services:
     environment:
       DATABASE_URL: ${POSTGRES_DATABASE_URL:-postgresql+psycopg://apiforge@postgres:5432/apiforge}
       PGPASSWORD: ${POSTGRES_PASSWORD:-}
+      JWT_SECRET: ${JWT_SECRET:?Generate JWT_SECRET in .env first}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      CORS_ORIGINS: ${CORS_ORIGINS:-[]}
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log"]
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log --no-proxy-headers"]
 volumes:
   sqlite-data:
   postgres-data:
