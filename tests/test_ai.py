@@ -246,3 +246,17 @@ def test_retry_then_recover(monkeypatch):
     adapter = provider(monkeypatch, handler)
     assert adapter.evaluate({})[1]["attempts"] == 2
     adapter.client.close()
+
+
+def test_optional_usage_metadata_can_be_null_or_malformed(monkeypatch):
+    for usage in [None, ["untrusted"], "untrusted"]:
+        adapter = provider(
+            monkeypatch,
+            lambda request, usage=usage: httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": json.dumps(FEEDBACK)}}], "usage": usage},
+            ),
+        )
+        feedback, metadata = adapter.evaluate({})
+        assert feedback.score == 80 and metadata["usage"] == {}
+        adapter.client.close()

@@ -7,8 +7,8 @@ Verified on 17 November 2026 with Python 3.12.14. Counts below are actual local 
 | Unmodified baseline | 34 passed, 98.94% application coverage |
 | Auth/history checkpoint | 61 passed, including preserved legacy rows |
 | Regex/categories/comparison checkpoint | 74 passed |
-| Final SQLite suite | **97 passed; 98.51% application line coverage** |
-| Final PostgreSQL suite | **98 passed; 98.51% application line coverage** |
+| Final SQLite suite | **98 passed; 98.51% application line coverage** |
+| Final PostgreSQL suite | **99 passed; 98.51% application line coverage** |
 | Ruff lint / formatting | Passed |
 | Legacy migrations | Seeded 0001 tasks/results upgraded to head on SQLite and PostgreSQL; scores/snapshots/IDs/engine versions preserved; schema drift check passed |
 | Competing updates | Two independent sessions raced; one revision update won, one returned conflict, on each database backend |
@@ -17,7 +17,7 @@ Verified on 17 November 2026 with Python 3.12.14. Counts below are actual local 
 | Dependency audit | pip-audit of final requirements-dev.lock: **no known vulnerabilities found** at execution time |
 | Docker | Image built with optional trusted CA build secret; UID 999; pip check passed; isolated demo passed |
 | Live container HTTP | Readiness/liveness and full authenticated mock-AI demo passed on port 8012 |
-| GitHub Actions | See the exact commit's Actions page; workflow file alone is not a successful hosted run |
+| GitHub Actions | Push and PR workflows for `cfce0f2` both passed; final follow-up commit is checked separately before delivery |
 | Paid/live model | **Not executed**; real adapter transport integration tested with mocks |
 | Hosted deployment | **Not performed**; Render template and instructions supplied |
 

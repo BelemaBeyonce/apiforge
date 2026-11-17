@@ -115,6 +115,8 @@ class OpenAIProvider:
                             result["choices"][0]["message"]["content"]
                         )
                         usage = result.get("usage", {})
+                        if not isinstance(usage, dict):
+                            usage = {}
                         safe = {
                             k: usage[k]
                             for k in ("prompt_tokens", "completion_tokens", "total_tokens")
@@ -125,7 +127,7 @@ class OpenAIProvider:
                             "attempts": attempt + 1,
                             "latency_ms": round((time.monotonic() - start) * 1000),
                         }
-                except (httpx.TimeoutException, httpx.NetworkError) as exc:
+                except httpx.RequestError as exc:
                     failure = ProviderError(
                         "provider_timeout"
                         if isinstance(exc, httpx.TimeoutException)
