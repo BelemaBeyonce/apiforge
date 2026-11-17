@@ -7,8 +7,8 @@ Verified on 17 November 2026 with Python 3.12.14. Counts below are actual local 
 | Unmodified baseline | 34 passed, 98.94% application coverage |
 | Auth/history checkpoint | 61 passed, including preserved legacy rows |
 | Regex/categories/comparison checkpoint | 74 passed |
-| Final SQLite suite | **98 passed; 98.51% application line coverage** |
-| Final PostgreSQL suite | **99 passed; 98.51% application line coverage** |
+| Final SQLite suite | **99 passed; 98.51% application line coverage** |
+| Final PostgreSQL suite | **100 passed; 98.51% application line coverage** |
 | Ruff lint / formatting | Passed |
 | Legacy migrations | Seeded 0001 tasks/results upgraded to head on SQLite and PostgreSQL; scores/snapshots/IDs/engine versions preserved; schema drift check passed |
 | Competing updates | Two independent sessions raced; one revision update won, one returned conflict, on each database backend |
@@ -39,6 +39,7 @@ The PostgreSQL suite uses unique per-test schemas in a disposable PostgreSQL 16 
 - Independently reproduced the old 34-test baseline before modifications.
 - Updated old regression contracts only where documented API changes require authentication, revision fields, and archive preservation. The original normal/invalid/edge scenarios remain tested.
 - Found original Starlette advisories during the dependency audit; upgraded FastAPI/Starlette and reran the complete suite. Also upgraded pip, a dependency of the audit tool. No advisories were suppressed.
+- Added a persisted regex-timeout API regression on both databases and widened the status column in revision 0005; SQLite alone would not reject the overlong status.
 - Fixed PostgreSQL FK-name discovery and portable typed JSON backfill while preserving the original migration file. SQLite FK checks protect batch recreation from the old cascade behavior.
 - Docker dependency installation uses this environment's enterprise-proxy CA through a build-only secret; certificate verification remains enabled. The default Dockerfile also works without that optional secret on ordinary trusted networks.
 - The final suite emits one upstream Starlette deprecation warning about HTTPX-based TestClient compatibility. Both final database runs still pass. Plan the next HTTP client compatibility upgrade under tests.

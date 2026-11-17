@@ -52,7 +52,7 @@ class Evaluation(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id", ondelete="RESTRICT"), index=True)
     author_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
-    status: Mapped[str] = mapped_column(String(20), default="completed", server_default="completed")
+    status: Mapped[str] = mapped_column(String(32), default="completed", server_default="completed")
     response: Mapped[str] = mapped_column(Text)
     score: Mapped[float] = mapped_column(Float)
     feedback: Mapped[list] = mapped_column(JSON)

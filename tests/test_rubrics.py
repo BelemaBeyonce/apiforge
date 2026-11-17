@@ -70,3 +70,14 @@ def test_comparison_and_api_regex(client, task_data):
     assert result["score_delta"] == -100
     assert result["same_rubric"] is True
     assert client.get(f"/api/v1/evaluations/{first['id']}/compare/999").status_code == 404
+
+
+def test_regex_budget_status_is_persisted(client, task_data):
+    task_data["criteria"] = [{"name": "limited", "kind": "regex", "reference": "(a+)+$"}]
+    task = client.post("/api/v1/tasks", json=task_data).json()
+    result = client.post(
+        f"/api/v1/tasks/{task['id']}/evaluations", json={"response": "a" * 20000 + "!"}
+    )
+    assert result.status_code == 201
+    assert result.json()["status"] == "completed_with_limits"
+    assert result.json()["feedback"][0]["reason"] == "regex_time_limit"
