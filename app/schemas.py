@@ -36,6 +36,29 @@ class RubricCategory(StrictModel):
     weight: int = Field(default=1, ge=1, le=100)
 
 
+class PythonAssessmentConfig(StrictModel):
+    assignment_type: Literal["script", "function", "class", "concept"] = "script"
+
+    required_concepts: list[str] = Field(default_factory=list, max_length=30)
+
+    syntax_check: bool = True
+
+    @field_validator("required_concepts")
+    @classmethod
+    def validate_concepts(cls, concepts):
+        from app.services.concept_checker import CONCEPT_NODES
+
+        unsupported = set(concepts) - set(CONCEPT_NODES)
+
+        if unsupported:
+            raise ValueError(f"Unsupported Python concepts: {sorted(unsupported)}")
+
+        if len(concepts) != len(set(concepts)):
+            raise ValueError("Required concepts must be unique")
+
+        return concepts
+
+
 class TaskInput(StrictModel):
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1, max_length=20000)
@@ -139,33 +162,3 @@ class ErrorBody(BaseModel):
 
 class ErrorResponse(BaseModel):
     error: ErrorBody
-
-
-class PythonAssessmentConfig(StrictModel):
-    assignment_type: Literal[
-        "script", "function", "class", "concept"
-    ] = "script"
-
-    required_concepts: list[str] = Field(
-        default_factory=list,
-        max_length=30
-    )
-
-    syntax_check: bool = True
-
-    @field_validator("required_concepts")
-    @classmethod
-    def validate_concepts(cls, concepts):
-        from app.services.concept_checker import CONCEPT_NODES
-
-        unsupported = set(concepts) - set(CONCEPT_NODES)
-
-        if unsupported:
-            raise ValueError(
-                f"Unsupported Python concepts: {sorted(unsupported)}"
-            )
-
-        if len(concepts) != len(set(concepts)):
-            raise ValueError("Required concepts must be unique")
-
-        return concepts

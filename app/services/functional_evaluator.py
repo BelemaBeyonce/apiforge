@@ -1,4 +1,5 @@
 import json
+
 from app.services.code_runner import run_python
 
 
@@ -30,6 +31,7 @@ def evaluate_script(code: str, expected_output: str) -> dict:
         "actual": actual,
     }
 
+
 def evaluate_script_tests(
     code: str,
     test_cases: list[dict],
@@ -55,21 +57,18 @@ def evaluate_script_tests(
         expected = test["expected_output"].strip()
         actual = execution["stdout"].strip()
 
-        passed = (
-            execution["passed"]
-            and actual == expected
+        passed = execution["passed"] and actual == expected
+
+        results.append(
+            {
+                "name": test["name"],
+                "passed": passed,
+                "expected": expected,
+                "actual": actual,
+            }
         )
 
-        results.append({
-            "name": test["name"],
-            "passed": passed,
-            "expected": expected,
-            "actual": actual,
-        })
-
-    passed_count = sum(
-        result["passed"] for result in results
-    )
+    passed_count = sum(result["passed"] for result in results)
 
     score = round(
         passed_count / len(test_cases) * 100,
@@ -82,9 +81,6 @@ def evaluate_script_tests(
         "total_tests": len(test_cases),
         "results": results,
     }
-
-import json
-from app.services.code_runner import run_python
 
 
 def evaluate_function_tests(
@@ -132,26 +128,20 @@ print(json.dumps(result))
             except (ValueError, TypeError):
                 pass
 
-        results.append({
-            "name": test["name"],
-            "passed": passed,
-            "expected": expected,
-            "actual": actual,
-            "error": (
-                execution["stderr"]
-                if not execution["passed"]
-                else None
-            ),
-        })
+        results.append(
+            {
+                "name": test["name"],
+                "passed": passed,
+                "expected": expected,
+                "actual": actual,
+                "error": (execution["stderr"] if not execution["passed"] else None),
+            }
+        )
 
-    passed_count = sum(
-        item["passed"] for item in results
-    )
+    passed_count = sum(item["passed"] for item in results)
 
     return {
-        "score": round(
-            passed_count / len(test_cases) * 100, 2
-        ),
+        "score": round(passed_count / len(test_cases) * 100, 2),
         "passed_tests": passed_count,
         "total_tests": len(test_cases),
         "results": results,

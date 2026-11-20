@@ -1,5 +1,3 @@
-from urllib import response
-
 from fastapi import HTTPException
 from sqlalchemy import exists, or_, select, update
 from sqlalchemy.orm import Session
@@ -9,6 +7,8 @@ from app.schemas import Criterion, RubricCategory, TaskInput
 from app.services.evaluator import ENGINE_VERSION, evaluate
 from app.services.python_evaluator import (
     ENGINE_VERSION as PYTHON_ENGINE_VERSION,
+)
+from app.services.python_evaluator import (
     evaluate_python,
 )
 

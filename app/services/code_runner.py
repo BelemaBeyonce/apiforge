@@ -1,7 +1,6 @@
 import subprocess
-import uuid
 import tempfile
-
+import uuid
 
 IMAGE = "python:3.12-slim"
 MAX_OUTPUT = 10_000
@@ -16,25 +15,41 @@ def run_python(code: str, timeout: int = 5) -> dict:
     """
     container_name = f"apiforge-{uuid.uuid4().hex}"
     command = [
-        "docker", "run", "--rm",
-        "--name", container_name,
-        "--network", "none",
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        container_name,
+        "--network",
+        "none",
         "--read-only",
-        "--cap-drop", "ALL",
-        "--security-opt", "no-new-privileges",
-        "--memory", "128m",
-        "--memory-swap", "128m",
-        "--cpus", "0.5",
-        "--pids-limit", "32",
-        "--user", "65534:65534",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--memory",
+        "128m",
+        "--memory-swap",
+        "128m",
+        "--cpus",
+        "0.5",
+        "--pids-limit",
+        "32",
+        "--user",
+        "65534:65534",
         IMAGE,
-        "python", "-I", "-B", "-c", code,
+        "python",
+        "-I",
+        "-B",
+        "-c",
+        code,
     ]
 
     try:
-        with tempfile.TemporaryFile(mode="w+b") as stdout_file, \
-            tempfile.TemporaryFile(mode="w+b") as stderr_file:
-
+        with (
+            tempfile.TemporaryFile(mode="w+b") as stdout_file,
+            tempfile.TemporaryFile(mode="w+b") as stderr_file,
+        ):
             result = subprocess.run(
                 command,
                 stdout=stdout_file,
@@ -46,28 +61,24 @@ def run_python(code: str, timeout: int = 5) -> dict:
             stdout_file.seek(0)
             stderr_file.seek(0)
 
-            stdout = stdout_file.read(MAX_OUTPUT).decode(
-                "utf-8", errors="replace"
-            )
-            stderr = stderr_file.read(MAX_OUTPUT).decode(
-                "utf-8", errors="replace"
-            )
-            
+            stdout = stdout_file.read(MAX_OUTPUT).decode("utf-8", errors="replace")
+            stderr = stderr_file.read(MAX_OUTPUT).decode("utf-8", errors="replace")
+
         result = subprocess.run(
             command,
             capture_output=True,
             text=True,
             timeout=timeout,
             check=False,
-            )
+        )
 
         return {
-        "passed": result.returncode == 0,
-        "stdout": stdout,
-        "stderr": stderr,
-        "returncode": result.returncode,
-        "timed_out": False,
-    }
+            "passed": result.returncode == 0,
+            "stdout": stdout,
+            "stderr": stderr,
+            "returncode": result.returncode,
+            "timed_out": False,
+        }
     except subprocess.TimeoutExpired:
         subprocess.run(
             ["docker", "rm", "-f", container_name],

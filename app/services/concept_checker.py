@@ -1,6 +1,5 @@
 import ast
 
-
 CONCEPT_NODES = {
     "variables": (ast.Assign, ast.AnnAssign, ast.NamedExpr),
     "conditionals": (ast.If,),
@@ -34,10 +33,7 @@ def check_concepts(code: str, required: list[str]) -> dict:
         if concept not in CONCEPT_NODES:
             raise ValueError(f"Unsupported concept: {concept}")
 
-        found = any(
-            isinstance(node, CONCEPT_NODES[concept])
-            for node in ast.walk(tree)
-        )
+        found = any(isinstance(node, CONCEPT_NODES[concept]) for node in ast.walk(tree))
 
         results[concept] = found
 

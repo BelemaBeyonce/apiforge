@@ -1,5 +1,5 @@
-from app.services.syntax_checker import check_syntax
 from app.services.concept_checker import check_concepts
+from app.services.syntax_checker import check_syntax
 
 ENGINE_VERSION = "python-static-v1"
 
@@ -20,16 +20,18 @@ def evaluate_python(code: str, config: dict):
         if syntax["passed"]:
             earned += 40
 
-        feedback.append({
-            "criterion": "Python Syntax",
-            "passed": syntax["passed"],
-            "earned_weight": 40 if syntax["passed"] else 0,
-            "possible_weight": 40,
-            "category": "syntax",
-            "contribution": 40 if syntax["passed"] else 0,
-            "reason": "valid_syntax" if syntax["passed"] else "syntax_error",
-            "message": syntax["message"],
-        })
+        feedback.append(
+            {
+                "criterion": "Python Syntax",
+                "passed": syntax["passed"],
+                "earned_weight": 40 if syntax["passed"] else 0,
+                "possible_weight": 40,
+                "category": "syntax",
+                "contribution": 40 if syntax["passed"] else 0,
+                "reason": "valid_syntax" if syntax["passed"] else "syntax_error",
+                "message": syntax["message"],
+            }
+        )
 
     if required:
         possible += 60
@@ -48,20 +50,22 @@ def evaluate_python(code: str, config: dict):
             if passed:
                 earned += per_concept
 
-            feedback.append({
-                "criterion": f"Concept: {concept}",
-                "passed": passed,
-                "earned_weight": 1 if passed else 0,
-                "possible_weight": 1,
-                "category": "concepts",
-                "contribution": round(per_concept if passed else 0, 4),
-                "reason": "concept_detected" if passed else "concept_missing",
-                "message": (
-                    f"Required concept '{concept}' detected"
-                    if passed else
-                    f"Required concept '{concept}' not detected"
-                ),
-            })
+            feedback.append(
+                {
+                    "criterion": f"Concept: {concept}",
+                    "passed": passed,
+                    "earned_weight": 1 if passed else 0,
+                    "possible_weight": 1,
+                    "category": "concepts",
+                    "contribution": round(per_concept if passed else 0, 4),
+                    "reason": "concept_detected" if passed else "concept_missing",
+                    "message": (
+                        f"Required concept '{concept}' detected"
+                        if passed
+                        else f"Required concept '{concept}' not detected"
+                    ),
+                }
+            )
 
     if possible == 0:
         return 0.0, feedback

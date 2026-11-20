@@ -44,10 +44,7 @@ class Task(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
-    python_assessment: Mapped[dict | None] = mapped_column(
-    JSON,
-    nullable=True
-    )
+    python_assessment: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class Evaluation(Base):
